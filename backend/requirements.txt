@@ -1,5 +1,0 @@
-Django
-openai
-gunicorn
-whitenoise
-python-dotenv

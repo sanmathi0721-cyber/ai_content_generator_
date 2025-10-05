@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Content Generator</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>✨ AI Content Generator</h1>
+    <form id="generateForm">
+      <label>Content Type:</label>
+      <select name="type">
+        <option>Email</option>
+        <option>Essay</option>
+        <option>Article</option>
+        <option>Blog Post</option>
+        <option>Cover Letter</option>
+      </select>
+
+      <label>Topic:</label>
+      <input type="text" name="topic" required>
+
+      <label>Tone:</label>
+      <select name="tone">
+        <option>Professional</option>
+        <option>Friendly</option>
+        <option>Creative</option>
+      </select>
+
+      <label>Word Count:</label>
+      <input type="number" name="word_count" value="200" min="50" max="1000">
+      <button type="submit">Generate ✨</button>
+    </form>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    document.getElementById('generateForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = new FormData(form);
+      const response = await fetch('/generate/', { method: 'POST', body: data });
+      const result = await response.json();
+      document.getElementById('result').innerHTML = result.result ? `<h3>📝 Result:</h3><p>${result.result}</p>` : `<p style="color:red;">${result.error}</p>`;
+    });
+  </script>
+</body>
+</html>

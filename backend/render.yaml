@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: ai-content-generator
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn config.wsgi:application"
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false

@@ -1,55 +1,33 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os
 import openai
+import os
 
+# Initialize Flask
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # ✅ Allow frontend to access this backend
 
-# Load environment variables
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY
+# ✅ Load your OpenAI API key from Render Environment
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Model name (you can use gpt-3.5-turbo or gpt-4o-mini)
-MODEL_NAME = "gpt-3.5-turbo"
+# 🩵 Health check route (optional but useful)
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok", "model": "gpt-3.5-turbo"}), 200
 
+# 🚀 Main generate route
 @app.route("/generate", methods=["POST"])
 def generate():
     try:
         data = request.get_json()
-        title = data.get("title", "Untitled")
-        tone = data.get("tone", "professional")
-        length = data.get("length", "medium")  # short, medium, long
-        mode = data.get("mode", "blog")  # blog, tweet, story, paragraph
+        prompt = data.get("prompt", "").strip()
 
-        prompt = f"""
-        Write a {length} {mode} titled "{title}" in a {tone} tone.
-        Include an intro, 2-3 key points, and a conclusion.
-        Make it engaging and well-structured.
-        """
+        if not prompt:
+            return jsonify({"error": "Prompt is required"}), 400
 
-        response = openai.ChatCompletion.create(
-            model=MODEL_NAME,
+        # 🧠 OpenAI ChatCompletion request
+        completion = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a creative AI content generator."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.85,
-            max_tokens=600,
-        )
-
-        content = response.choices[0].message["content"].strip()
-        return jsonify({"status": "ok", "output": content})
-
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route("/health")
-def health():
-    return jsonify({"status": "ok", "model": MODEL_NAME})
-
-
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+                {
+                    "role": "user",

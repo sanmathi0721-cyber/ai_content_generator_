@@ -5,7 +5,7 @@ from transformers import pipeline
 app = Flask(__name__)
 CORS(app)
 
-# Use free Hugging Face model (no API key needed)
+# Hugging Face free model
 generator = pipeline("text-generation", model="gpt2")
 
 @app.route("/")

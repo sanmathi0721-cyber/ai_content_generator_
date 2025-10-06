@@ -1,44 +1,55 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-from openai import OpenAI
 import os
+import openai
 
-# ✅ Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # allow requests from external frontend (GitHub Pages, etc.)
+CORS(app)
 
-# ✅ Initialize OpenAI client (reads key from Render environment)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Load environment variables
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+openai.api_key = OPENAI_API_KEY
 
-@app.route('/')
-def home():
-    return render_template('index.html')
+# Model name (you can use gpt-3.5-turbo or gpt-4o-mini)
+MODEL_NAME = "gpt-3.5-turbo"
 
-@app.route('/generate', methods=['POST'])
+@app.route("/generate", methods=["POST"])
 def generate():
     try:
         data = request.get_json()
-        topic = data.get('topic')
-        content_type = data.get('type')
-        tone = data.get('tone')
-        word_count = data.get('word_count')
+        title = data.get("title", "Untitled")
+        tone = data.get("tone", "professional")
+        length = data.get("length", "medium")  # short, medium, long
+        mode = data.get("mode", "blog")  # blog, tweet, story, paragraph
 
-        if not topic:
-            return jsonify({'error': 'Please enter a topic.'})
+        prompt = f"""
+        Write a {length} {mode} titled "{title}" in a {tone} tone.
+        Include an intro, 2-3 key points, and a conclusion.
+        Make it engaging and well-structured.
+        """
 
-        prompt = f"Write a {tone.lower()} {content_type.lower()} about '{topic}' in around {word_count} words."
-
-        response = client.responses.create(
-            model="gpt-4.1-mini",
-            input=prompt
+        response = openai.ChatCompletion.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": "You are a creative AI content generator."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.85,
+            max_tokens=600,
         )
 
-        result = response.output[0].content[0].text
-        return jsonify({'result': result})
+        content = response.choices[0].message["content"].strip()
+        return jsonify({"status": "ok", "output": content})
 
     except Exception as e:
-        return jsonify({'error': str(e)})
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-# ✅ Required for Render and local runs
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok", "model": MODEL_NAME})
+
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

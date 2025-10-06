@@ -1,25 +1,38 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os
+import os, requests
 
-# Optional: only import openai if key exists
+# Optional imports
 try:
     import openai
 except ImportError:
     openai = None
 
+try:
+    import cohere
+except ImportError:
+    cohere = None
+
 app = Flask(__name__)
 CORS(app)
 
-# Load OpenAI API key
+# Load API keys
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+COHERE_KEY = os.getenv("COHERE_API_KEY")
+HUGGINGFACE_KEY = os.getenv("HUGGINGFACE_API_KEY")
+
+# Initialize clients if available
 if openai and OPENAI_KEY:
     openai.api_key = OPENAI_KEY
+
+co = None
+if cohere and COHERE_KEY:
+    co = cohere.Client(COHERE_KEY)
 
 
 @app.route("/", methods=["GET"])
 def home():
-    return jsonify({"message": "✅ AI Content Generator Backend is running!"}), 200
+    return jsonify({"message": "✅ Multi-AI Content Generator Backend is running!"}), 200
 
 
 @app.route("/health", methods=["GET"])
@@ -36,29 +49,67 @@ def generate():
         if not prompt:
             return jsonify({"error": "Prompt is required"}), 400
 
-        # ✅ If OpenAI API key is valid, use it
+        # 1️⃣ Try OpenAI first
         if openai and OPENAI_KEY:
             try:
+                print("🧠 Using OpenAI...")
                 response = openai.ChatCompletion.create(
                     model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "user", "content": f"Write a creative paragraph about {prompt}"}
-                    ],
-                    max_tokens=200,
+                    messages=[{"role": "user", "content": f"Write a detailed creative article about {prompt}"}],
+                    max_tokens=400,
                     temperature=0.8,
                 )
                 output = response["choices"][0]["message"]["content"].strip()
                 return jsonify({"output": output}), 200
-
             except Exception as e:
-                print("⚠️ OpenAI error:", e)
+                print("⚠️ OpenAI failed:", e)
 
-        # 🔄 Offline fallback mode (if no key or quota issue)
-        fake_output = f"Here’s a creative sample text about **{prompt}**.\n\n{prompt.capitalize()} is an interesting topic that inspires imagination, creativity, and innovation. This text is auto-generated locally for demo purposes."
+        # 2️⃣ Then try Cohere
+        if co:
+            try:
+                print("🧠 Using Cohere...")
+                resp = co.generate(
+                    model="command-xlarge-nightly",
+                    prompt=f"Write a creative and professional article about {prompt}",
+                    max_tokens=400,
+                    temperature=0.8,
+                )
+                output = resp.generations[0].text.strip()
+                return jsonify({"output": output}), 200
+            except Exception as e:
+                print("⚠️ Cohere failed:", e)
+
+        # 3️⃣ Then try Hugging Face
+        if HUGGINGFACE_KEY:
+            try:
+                print("🧠 Using Hugging Face...")
+                headers = {"Authorization": f"Bearer {HUGGINGFACE_KEY}"}
+                json_data = {"inputs": f"Write a detailed article about {prompt}"}
+                hf_resp = requests.post(
+                    "https://api-inference.huggingface.co/models/gpt2",
+                    headers=headers,
+                    json=json_data,
+                    timeout=30
+                )
+                if hf_resp.status_code == 200:
+                    output = hf_resp.json()[0]["generated_text"]
+                    return jsonify({"output": output}), 200
+                else:
+                    print("⚠️ Hugging Face error:", hf_resp.text)
+            except Exception as e:
+                print("⚠️ Hugging Face failed:", e)
+
+        # 4️⃣ Local fallback (never fails)
+        print("💡 Using local fallback text.")
+        fake_output = (
+            f"Here’s a creative example article about **{prompt}**.\n\n"
+            f"{prompt.capitalize()} is an inspiring topic that sparks curiosity, innovation, "
+            f"and creativity. This text was generated locally for demonstration purposes."
+        )
         return jsonify({"output": fake_output}), 200
 
     except Exception as e:
-        print("❌ Backend error:", e)
+        print("❌ Backend Error:", e)
         return jsonify({"error": str(e)}), 500
 
 
